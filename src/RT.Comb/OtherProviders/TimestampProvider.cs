@@ -17,9 +17,38 @@ using System;
 
 namespace RT.Comb {
 
-	public delegate DateTime TimestampProvider();
+    public interface ITimestampProvider
+    {
+        DateTime GetTimestamp();
+    }
 
-	public class UtcNoRepeatTimestampProvider {
+    
+
+    public class DefaultTimestampProvider : ITimestampProvider
+    {
+        public DefaultTimestampProvider(IClock clock)
+        {
+            Clock = clock;
+        }
+
+        public DefaultTimestampProvider() : this(new SystemClock()) { }
+
+        public IClock Clock { get; }
+
+        public DateTime GetTimestamp()
+        {
+            return Clock.UtcNow;
+        }
+    }
+
+	public class UtcNoRepeatTimestampProvider : ITimestampProvider
+	{
+	    public UtcNoRepeatTimestampProvider(IClock clock)
+	    {
+	        Clock = clock;
+        }
+
+        public UtcNoRepeatTimestampProvider() : this(new SystemClock()) { }
 
 		private DateTime lastValue = DateTime.MinValue;
 		private object locker = new object();
@@ -28,8 +57,11 @@ namespace RT.Comb {
 		// If using UnixDateTimeStrategy, you can set this to as low as 1ms.
 		public double IncrementMs { get; set; } = 4;
 
-		public DateTime GetTimestamp() {
-			var now = DateTime.UtcNow;
+	    public IClock Clock { get; }
+
+        public DateTime GetTimestamp()
+		{
+			var now = Clock.UtcNow;
 			lock(locker) {
 				// Ensure the time difference between the last value and this one is at least the increment threshold
 				if((now - lastValue).TotalMilliseconds < IncrementMs) {
@@ -40,7 +72,5 @@ namespace RT.Comb {
 			}
 			return now;
 		}
-
 	}
-
 }

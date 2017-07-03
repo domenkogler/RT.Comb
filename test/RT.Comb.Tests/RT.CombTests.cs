@@ -5,11 +5,10 @@ using RT.Comb;
 namespace RT.CombTests {
 
 	public class MainTests {
-
-		private static UtcNoRepeatTimestampProvider NoDupeProvider = new UtcNoRepeatTimestampProvider();
-
-		private ICombProvider SqlNoRepeatCombs = new SqlCombProvider(new SqlDateTimeStrategy()) { TimestampProvider = NoDupeProvider.GetTimestamp };
-		private ICombProvider SqlCombs = new SqlCombProvider(new SqlDateTimeStrategy());
+        
+		private ICombProvider SqlNoRepeatCombs = new SqlCombProvider(new SqlDateTimeStrategy(), new UtcNoRepeatTimestampProvider(new SystemClock()), new DefaultGuidProvider());
+	    private ICombProvider SqlNoRepeatFakeClockCombs = new SqlCombProvider(new SqlDateTimeStrategy(), new UtcNoRepeatTimestampProvider(new FakeClock(DateTime.UtcNow)), new DefaultGuidProvider());
+        private ICombProvider SqlCombs = new SqlCombProvider(new SqlDateTimeStrategy());
 		private ICombProvider PostgreCombs = new PostgreSqlCombProvider(new UnixDateTimeStrategy());
 		private ICombProvider HybridCombs = new SqlCombProvider(new UnixDateTimeStrategy());
 		private UnixDateTimeStrategy UnixStrategy = new UnixDateTimeStrategy();
@@ -143,6 +142,33 @@ namespace RT.CombTests {
 			Assert.Equal(1000, inSequenceCount);
 		}
 
-	}
+	    /// <summary>
+	    /// Ensure that the UtcNoRepeatTimestampProvider will not generate COMBs with the same or
+	    /// out of order timestamps. Uses SqlDateTimeStrategy because it has the lowest resolution
+	    /// and thus the highest potential for a collision.
+	    /// </summary>
+	    [Fact]
+	    public void TestUtcNoRepeatTimestampProviderFrozenTime()
+	    {
+	        var g1 = SqlNoRepeatFakeClockCombs.Create();
+	        var dt1 = SqlNoRepeatFakeClockCombs.GetTimestamp(g1);
+	        var inSequenceCount = 0;
+	        for (var i = 0; i < 1000; i++)
+	        {
+	            var g2 = SqlNoRepeatFakeClockCombs.Create();
+	            var dt2 = SqlNoRepeatFakeClockCombs.GetTimestamp(g2);
+	            if (dt2 > dt1)
+	            {
+	                inSequenceCount++;
+	            }
+	            else
+	            {
+	                Console.WriteLine($"{dt1:MM/dd/yyyy hh:mm:ss.fff} > {dt2:MM/dd/yyyy hh:mm:ss.fff}");
+	            }
+	            dt1 = dt2;
+	        }
+	        Assert.Equal(1000, inSequenceCount);
+	    }
 
+    }
 }

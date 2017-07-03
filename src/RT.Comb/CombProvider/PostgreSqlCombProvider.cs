@@ -19,22 +19,34 @@ namespace RT.Comb {
 
     public class PostgreSqlCombProvider : BaseCombProvider {
 
-		public PostgreSqlCombProvider(ICombDateTimeStrategy dateTimeStrategy) : base(dateTimeStrategy) {}
+        public PostgreSqlCombProvider(
+            ICombDateTimeStrategy dateTimeStrategy,
+            ITimestampProvider timestampProvider,
+            IGuidProvider guidProvider)
+            : base(dateTimeStrategy, timestampProvider, guidProvider)
+        {
+        }
 
-		public override Guid Create(Guid value, DateTime timestamp) {
+        public PostgreSqlCombProvider(
+            ICombDateTimeStrategy dateTimeStrategy)
+            : base(dateTimeStrategy, new DefaultTimestampProvider(), new DefaultGuidProvider())
+        {
+        }
+
+        public override Guid Create(Guid value, DateTime timestamp) {
 			var gbytes = value.ToByteArray();
-			var dbytes = _dateTimeStrategy.DateTimeToBytes(timestamp);
-			Array.Copy(dbytes, 0, gbytes, 0, _dateTimeStrategy.NumDateBytes);
+			var dbytes = DateTimeStrategy.DateTimeToBytes(timestamp);
+			Array.Copy(dbytes, 0, gbytes, 0, DateTimeStrategy.NumDateBytes);
 			SwapByteOrderForStringOrder(gbytes);
 			return new Guid(gbytes);
 		}
 
 		public override DateTime GetTimestamp(Guid comb) {
 			var gbytes = comb.ToByteArray();
-			var dbytes = new byte[_dateTimeStrategy.NumDateBytes];
+			var dbytes = new byte[DateTimeStrategy.NumDateBytes];
 			SwapByteOrderForStringOrder(gbytes);
-			Array.Copy(gbytes, 0, dbytes, 0, _dateTimeStrategy.NumDateBytes);
-			return _dateTimeStrategy.BytesToDateTime(dbytes);
+			Array.Copy(gbytes, 0, dbytes, 0, DateTimeStrategy.NumDateBytes);
+			return DateTimeStrategy.BytesToDateTime(dbytes);
 		}
 
 		// IDateTimeStrategy is required to provide the bytes we need in network byte order, and that's what we want
@@ -46,7 +58,5 @@ namespace RT.Comb {
 			if(input.Length==4) return;
 			Array.Reverse(input,4,2);				// Swap around the next 2 bytes
 		}
-
     }
-
 }

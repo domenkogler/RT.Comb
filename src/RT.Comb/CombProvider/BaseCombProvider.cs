@@ -17,43 +17,72 @@
 
 namespace RT.Comb {
 
-	// Not worth its own file. Allows overriding how the random portion of Guids are created, in case
-	// someone wants to use a different algorithm than Guid.NewGuid() or wants to decorate it before
-	// the timestamp embedding (such as overriding another portion of the random bytes for some another
-	// purpose).
-	public delegate Guid GuidProvider();
+    /// <summary>
+    /// An interface for working with COMB GUIDs, implemented for both variants.
+    /// </summary>
+    public interface ICombProvider
+    {
+        /// <summary>
+        /// Returns a new Guid COMB, consisting of a random Guid combined with the current UTC timestamp.
+        /// </summary>
+        Guid Create();
 
+        /// <summary>
+        /// Returns a new Guid COMB, consisting of the specified Guid combined with the current UTC timestamp.
+        /// </summary>
+        Guid Create(Guid value);
 
-	// This base class handles common methods for both the SQL Server and PostgreSql implementations.
-	// Note that either implementation can be paired with either CombDateTimeStrategy.
+        /// <summary>
+        /// Returns a new Guid COMB, consisting of a random Guid combined with the provided timestamp.
+        /// </summary>
+        Guid Create(DateTime timestamp);
+
+        /// <summary>
+        /// Returns a new Guid COMB, consisting of the provided Guid and provided timestamp.
+        /// </summary>
+        Guid Create(Guid value, DateTime timestamp);
+
+        /// <summary>
+        /// Extracts the DateTime embedded in a COMB GUID of the current Variant.
+        /// </summary>
+        /// <param name="value">COMB GUID</param>
+        /// <returns>DateTime embedded in <paramref name="value"/></returns>
+        DateTime GetTimestamp(Guid value);
+
+        ICombDateTimeStrategy DateTimeStrategy { get; }
+        /// <summary>
+        /// Provides the timestamp value for Create() calls that don't include a timestamp argument.
+        /// </summary>
+        ITimestampProvider TimestampProvider { get; }
+        IGuidProvider GuidProvider { get; }
+    }
+
+    // This base class handles common methods for both the SQL Server and PostgreSql implementations.
+    // Note that either implementation can be paired with either CombDateTimeStrategy.
     public abstract class BaseCombProvider : ICombProvider {
-
-		protected ICombDateTimeStrategy _dateTimeStrategy;
-
-		public BaseCombProvider(ICombDateTimeStrategy dateTimeStrategy) {
+        protected BaseCombProvider(ICombDateTimeStrategy dateTimeStrategy, ITimestampProvider timestampProvider, IGuidProvider guidProvider) {
 			if(dateTimeStrategy.NumDateBytes != 4 && dateTimeStrategy.NumDateBytes != 6) {
 				throw new NotSupportedException("ICombDateTimeStrategy is limited to either 4 or 6 bytes.");
 			}
-			_dateTimeStrategy = dateTimeStrategy;
+		    DateTimeStrategy = dateTimeStrategy;
+		    TimestampProvider = timestampProvider;
+		    GuidProvider = guidProvider;
 		}
 
 		public abstract DateTime GetTimestamp(Guid comb);
 
-		public Guid Create() => Create(GuidProvider.Invoke(), TimestampProvider.Invoke());
+		public Guid Create() => Create(GuidProvider.NewGuid(), TimestampProvider.GetTimestamp());
 
-		public Guid Create(Guid value) => Create(value, TimestampProvider.Invoke());
+		public Guid Create(Guid value) => Create(value, TimestampProvider.GetTimestamp());
 
-		public Guid Create(DateTime timestamp) => Create(GuidProvider.Invoke(), timestamp);
+		public Guid Create(DateTime timestamp) => Create(GuidProvider.NewGuid(), timestamp);
 
 		public abstract Guid Create(Guid value, DateTime timestamp);
+        
+        public ICombDateTimeStrategy DateTimeStrategy { get; }
 
-		// Default timestamp is UtcNow, but that's a property, wrap it as a function to meet the delegate spec
-		protected static DateTime DefaultTimestampProvider() => DateTime.UtcNow;
+        public ITimestampProvider TimestampProvider { get; }
 
-		public TimestampProvider TimestampProvider { get; set; } = DefaultTimestampProvider;
-
-		public GuidProvider GuidProvider { get; set; } = Guid.NewGuid;
-
+        public IGuidProvider GuidProvider { get; }
     }
-
 }

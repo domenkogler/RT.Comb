@@ -1,4 +1,6 @@
 using System;
+using System.Linq.Expressions;
+
 /*
 	Copyright 2015-2017 Richard S. Tallent, II
 
@@ -21,22 +23,30 @@ namespace RT.Comb {
 
 		private const int EmbedAtIndex = 10;
 
-		public SqlCombProvider(ICombDateTimeStrategy dateTimeStrategy) : base(dateTimeStrategy) {}
+        public SqlCombProvider(ICombDateTimeStrategy dateTimeStrategy)
+            : this(dateTimeStrategy, new UtcNoRepeatTimestampProvider(), new DefaultGuidProvider())
+        {
+        }
 
-		public override Guid Create(Guid value, DateTime timestamp) {
+        public SqlCombProvider(ICombDateTimeStrategy dateTimeStrategy,
+            ITimestampProvider timestampProvider,
+            IGuidProvider guidProvider)
+            : base(dateTimeStrategy, timestampProvider, guidProvider)
+        {
+        }
+
+        public override Guid Create(Guid value, DateTime timestamp) {
 			var gbytes = value.ToByteArray();
-			var dbytes = _dateTimeStrategy.DateTimeToBytes(timestamp);
-			Array.Copy(dbytes, 0, gbytes, EmbedAtIndex, _dateTimeStrategy.NumDateBytes);
+			var dbytes = DateTimeStrategy.DateTimeToBytes(timestamp);
+			Array.Copy(dbytes, 0, gbytes, EmbedAtIndex, DateTimeStrategy.NumDateBytes);
 			return new Guid(gbytes);
 		}
 
 		public override DateTime GetTimestamp(Guid comb) {
 			var gbytes = comb.ToByteArray();
-			var dbytes = new byte[_dateTimeStrategy.NumDateBytes];
-			Array.Copy(gbytes, EmbedAtIndex, dbytes, 0, _dateTimeStrategy.NumDateBytes);
-			return _dateTimeStrategy.BytesToDateTime(dbytes);
+			var dbytes = new byte[DateTimeStrategy.NumDateBytes];
+			Array.Copy(gbytes, EmbedAtIndex, dbytes, 0, DateTimeStrategy.NumDateBytes);
+			return DateTimeStrategy.BytesToDateTime(dbytes);
 		}
-
     }
-
 }
